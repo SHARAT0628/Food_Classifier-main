@@ -3,762 +3,539 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NutriScan — AI Food Analyzer</title>
-    <meta name="description" content="Upload a food image and get instant AI-powered classification with detailed nutritional information.">
+    <title>NutriVision: Automated Dietary Assessment</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        *, *::before, *::after {
+        :root {
+            /* Academic / Clinical Color Palette */
+            --primary-blue: #0052CC;
+            --primary-light: #E6F0FF;
+            --accent-teal: #00A3BF;
+            --bg-body: #F4F7F9;
+            --bg-card: #FFFFFF;
+            --text-main: #172B4D;
+            --text-muted: #5E6C84;
+            --border-light: #DFE1E6;
+            --success-green: #36B37E;
+            --shadow-sm: 0 4px 12px rgba(9, 30, 66, 0.05);
+            --shadow-md: 0 8px 24px rgba(9, 30, 66, 0.08);
+            --radius-main: 12px;
+            --transition-smooth: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-        }
-
-        :root {
-            --bg-primary: #0a0a0f;
-            --bg-secondary: #12121a;
-            --bg-card: rgba(255, 255, 255, 0.04);
-            --bg-card-hover: rgba(255, 255, 255, 0.07);
-            --border-subtle: rgba(255, 255, 255, 0.08);
-            --border-glow: rgba(139, 92, 246, 0.3);
-            --text-primary: #f0f0f5;
-            --text-secondary: #9ca3af;
-            --text-muted: #6b7280;
-            --accent-purple: #8b5cf6;
-            --accent-violet: #7c3aed;
-            --accent-pink: #ec4899;
-            --accent-cyan: #06b6d4;
-            --accent-emerald: #10b981;
-            --accent-amber: #f59e0b;
-            --accent-red: #ef4444;
-            --gradient-primary: linear-gradient(135deg, #8b5cf6, #ec4899);
-            --gradient-bg: linear-gradient(160deg, #0a0a0f 0%, #1a1025 50%, #0a0a0f 100%);
-            --shadow-glow: 0 0 40px rgba(139, 92, 246, 0.15);
-            --radius-sm: 8px;
-            --radius-md: 12px;
-            --radius-lg: 16px;
-            --radius-xl: 24px;
+            font-family: 'Inter', sans-serif;
         }
 
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--gradient-bg);
-            color: var(--text-primary);
+            background-color: var(--bg-body);
+            color: var(--text-main);
             min-height: 100vh;
-            overflow-x: hidden;
-            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
         }
 
-        /* Animated background orbs */
-        body::before, body::after {
-            content: '';
-            position: fixed;
-            border-radius: 50%;
-            filter: blur(120px);
-            opacity: 0.3;
-            z-index: 0;
-            pointer-events: none;
-        }
-        body::before {
-            width: 500px; height: 500px;
-            background: var(--accent-purple);
-            top: -150px; right: -100px;
-            animation: floatOrb 15s ease-in-out infinite;
-        }
-        body::after {
-            width: 400px; height: 400px;
-            background: var(--accent-pink);
-            bottom: -100px; left: -100px;
-            animation: floatOrb 18s ease-in-out infinite reverse;
+        .container {
+            width: 100%;
+            max-width: 800px;
+            background: var(--bg-card);
+            border-radius: var(--radius-main);
+            box-shadow: var(--shadow-md);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            animation: fadeIn 0.6s ease-out;
         }
 
-        @keyframes floatOrb {
-            0%, 100% { transform: translate(0, 0) scale(1); }
-            33% { transform: translate(60px, -40px) scale(1.1); }
-            66% { transform: translate(-30px, 30px) scale(0.95); }
+        /* Header / Nav */
+        .header {
+            background: var(--primary-blue);
+            padding: 30px 40px;
+            color: #FFFFFF;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        /* Main container */
-        .app-container {
-            position: relative;
-            z-index: 1;
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 40px 24px 60px;
-            min-height: 100vh;
+        .header-brand {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header-title {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-title svg {
+            width: 28px;
+            height: 28px;
+            fill: #FFFFFF;
+        }
+
+        .header-subtitle {
+            font-size: 13px;
+            font-weight: 300;
+            opacity: 0.85;
+            margin-top: 4px;
+        }
+
+        /* Diagnostic Area */
+        .diagnostic-zone {
+            padding: 40px;
             display: flex;
             flex-direction: column;
             align-items: center;
         }
 
-        /* Header */
-        .header {
+        /* Upload Container */
+        .upload-container {
+            width: 100%;
+            max-width: 500px;
+            border: 2px dashed var(--border-light);
+            border-radius: var(--radius-main);
+            background: #FAFBFC;
+            padding: 40px 20px;
             text-align: center;
-            margin-bottom: 48px;
-            animation: fadeInDown 0.8s ease-out;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+            position: relative;
         }
 
-        .header__logo {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
+        .upload-container:hover, .upload-container.dragover {
+            border-color: var(--primary-blue);
+            background: var(--primary-light);
+        }
+
+        .upload-icon {
+            font-size: 40px;
+            color: var(--primary-blue);
             margin-bottom: 12px;
         }
 
-        .header__icon {
-            width: 44px;
-            height: 44px;
-            background: var(--gradient-primary);
-            border-radius: var(--radius-md);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 22px;
-            box-shadow: var(--shadow-glow);
-        }
-
-        .header__title {
-            font-size: 32px;
-            font-weight: 800;
-            background: var(--gradient-primary);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            letter-spacing: -0.5px;
-        }
-
-        .header__subtitle {
-            font-size: 15px;
-            color: var(--text-secondary);
-            font-weight: 400;
-            max-width: 450px;
-            margin: 0 auto;
-            line-height: 1.5;
-        }
-
-        /* Upload area */
-        .upload-zone {
-            width: 100%;
-            max-width: 560px;
-            border: 2px dashed var(--border-subtle);
-            border-radius: var(--radius-xl);
-            padding: 48px 32px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            background: var(--bg-card);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            position: relative;
-            overflow: hidden;
-            animation: fadeInUp 0.8s ease-out 0.1s both;
-        }
-
-        .upload-zone::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(135deg, rgba(139, 92, 246, 0.05), rgba(236, 72, 153, 0.05));
-            opacity: 0;
-            transition: opacity 0.4s;
-        }
-
-        .upload-zone:hover, .upload-zone.drag-over {
-            border-color: var(--accent-purple);
-            background: var(--bg-card-hover);
-            box-shadow: var(--shadow-glow);
-            transform: translateY(-2px);
-        }
-
-        .upload-zone:hover::before, .upload-zone.drag-over::before {
-            opacity: 1;
-        }
-
-        .upload-zone.has-image {
-            padding: 16px;
-            border-style: solid;
-            border-color: var(--border-glow);
-        }
-
-        .upload-zone__icon {
-            width: 72px;
-            height: 72px;
-            margin: 0 auto 20px;
-            background: rgba(139, 92, 246, 0.1);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 32px;
-            transition: transform 0.3s;
-        }
-
-        .upload-zone:hover .upload-zone__icon {
-            transform: scale(1.1);
-        }
-
-        .upload-zone__text {
+        .upload-text {
             font-size: 16px;
             font-weight: 500;
-            color: var(--text-primary);
+            color: var(--text-main);
             margin-bottom: 6px;
         }
 
-        .upload-zone__hint {
+        .upload-subtext {
             font-size: 13px;
             color: var(--text-muted);
         }
 
-        .upload-zone__hint span {
-            color: var(--accent-purple);
-            font-weight: 500;
-        }
-
-        #image-preview {
-            max-width: 100%;
-            max-height: 380px;
-            border-radius: var(--radius-lg);
-            object-fit: contain;
+        #file-input {
             display: none;
         }
 
-        .upload-zone.has-image #image-preview {
+        /* Image Preview Box */
+        .preview-box {
+            display: none;
+            width: 100%;
+            max-width: 500px;
+            border-radius: var(--radius-main);
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+            position: relative;
+            background: #000;
+        }
+
+        .preview-box img {
+            width: 100%;
+            height: 300px;
+            object-fit: contain;
             display: block;
         }
 
-        .upload-zone.has-image .upload-zone__icon,
-        .upload-zone.has-image .upload-zone__text,
-        .upload-zone.has-image .upload-zone__hint {
-            display: none;
+        .reselect-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 4px;
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            color: var(--text-main);
+            box-shadow: var(--shadow-sm);
         }
 
-        #image-input {
-            display: none;
-        }
-
-        /* Analyze button */
-        .analyze-btn {
-            margin-top: 24px;
-            padding: 14px 48px;
+        /* Action Button */
+        .action-btn {
+            margin-top: 30px;
+            background: var(--primary-blue);
+            color: #FFF;
+            border: none;
+            border-radius: 6px;
+            padding: 14px 40px;
             font-size: 15px;
             font-weight: 600;
-            font-family: 'Inter', sans-serif;
-            color: #fff;
-            background: var(--gradient-primary);
-            border: none;
-            border-radius: 50px;
             cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 4px 20px rgba(139, 92, 246, 0.3);
+            transition: var(--transition-smooth);
             display: none;
-            animation: fadeInUp 0.5s ease-out;
-            letter-spacing: 0.3px;
-        }
-
-        .analyze-btn.visible {
-            display: inline-flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
+            box-shadow: 0 4px 14px rgba(0, 82, 204, 0.3);
         }
 
-        .analyze-btn:hover {
+        .action-btn:hover {
+            background: #0047b3;
             transform: translateY(-2px);
-            box-shadow: 0 6px 30px rgba(139, 92, 246, 0.45);
         }
 
-        .analyze-btn:active {
-            transform: translateY(0);
-        }
-
-        .analyze-btn:disabled {
-            opacity: 0.6;
+        .action-btn:disabled {
+            background: var(--text-muted);
             cursor: not-allowed;
             transform: none;
+            box-shadow: none;
         }
 
         /* Spinner */
         .spinner {
-            width: 18px;
-            height: 18px;
-            border: 2px solid rgba(255,255,255,0.3);
-            border-top-color: #fff;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.4);
+            border-top-color: #FFF;
             border-radius: 50%;
-            animation: spin 0.7s linear infinite;
+            animation: spin 0.8s linear infinite;
             display: none;
         }
 
-        .analyze-btn.loading .spinner { display: block; }
-        .analyze-btn.loading .btn-text { display: none; }
-        .analyze-btn.loading .btn-loading-text { display: inline; }
-        .btn-loading-text { display: none; }
+        .action-btn.loading .spinner { display: block; }
+        .action-btn.loading span { display: none; }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* Results section */
-        .results {
+        /* Results Panel */
+        .results-panel {
             width: 100%;
-            max-width: 560px;
-            margin-top: 32px;
+            margin-top: 40px;
             display: none;
-            animation: fadeInUp 0.6s ease-out;
+            animation: fadeIn 0.5s ease-out;
         }
 
-        .results.visible { display: block; }
-
-        /* Food name card */
-        .food-card {
-            background: var(--bg-card);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-xl);
-            padding: 28px;
-            margin-bottom: 16px;
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .food-card::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0;
-            height: 3px;
-            background: var(--gradient-primary);
-        }
-
-        .food-card__label {
-            font-size: 12px;
-            font-weight: 600;
-            letter-spacing: 1.5px;
-            text-transform: uppercase;
-            color: var(--accent-purple);
-            margin-bottom: 8px;
-        }
-
-        .food-card__name {
-            font-size: 28px;
-            font-weight: 700;
-            color: var(--text-primary);
-            text-transform: capitalize;
-            letter-spacing: -0.3px;
-        }
-
-        .food-card__confidence {
-            font-size: 13px;
-            color: var(--text-muted);
-            margin-top: 6px;
-        }
-
-        /* Nutrition grid */
-        .nutrition-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-        }
-
-        .nutrient-card {
-            background: var(--bg-card);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-lg);
-            padding: 20px;
-            transition: all 0.3s;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .nutrient-card:hover {
-            border-color: var(--border-glow);
-            background: var(--bg-card-hover);
-            transform: translateY(-2px);
-        }
-
-        .nutrient-card__header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 12px;
-        }
-
-        .nutrient-card__icon {
-            width: 36px;
-            height: 36px;
-            border-radius: var(--radius-sm);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 16px;
-        }
-
-        .nutrient-card--calories .nutrient-card__icon { background: rgba(245, 158, 11, 0.15); }
-        .nutrient-card--protein .nutrient-card__icon { background: rgba(239, 68, 68, 0.15); }
-        .nutrient-card--carbs .nutrient-card__icon { background: rgba(6, 182, 212, 0.15); }
-        .nutrient-card--fat .nutrient-card__icon { background: rgba(16, 185, 129, 0.15); }
-
-        .nutrient-card__label {
-            font-size: 12px;
-            font-weight: 500;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.8px;
-        }
-
-        .nutrient-card__value {
-            font-size: 28px;
-            font-weight: 700;
-            letter-spacing: -0.5px;
-        }
-
-        .nutrient-card--calories .nutrient-card__value { color: var(--accent-amber); }
-        .nutrient-card--protein .nutrient-card__value { color: var(--accent-red); }
-        .nutrient-card--carbs .nutrient-card__value { color: var(--accent-cyan); }
-        .nutrient-card--fat .nutrient-card__value { color: var(--accent-emerald); }
-
-        .nutrient-card__unit {
-            font-size: 14px;
-            font-weight: 400;
-            color: var(--text-secondary);
-            margin-left: 2px;
-        }
-
-        .nutrient-card__bar {
-            height: 4px;
-            background: rgba(255,255,255,0.06);
-            border-radius: 4px;
-            margin-top: 12px;
-            overflow: hidden;
-        }
-
-        .nutrient-card__bar-fill {
-            height: 100%;
-            border-radius: 4px;
-            transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
-            width: 0%;
-        }
-
-        .nutrient-card--calories .nutrient-card__bar-fill { background: var(--accent-amber); }
-        .nutrient-card--protein .nutrient-card__bar-fill { background: var(--accent-red); }
-        .nutrient-card--carbs .nutrient-card__bar-fill { background: var(--accent-cyan); }
-        .nutrient-card--fat .nutrient-card__bar-fill { background: var(--accent-emerald); }
-
-        /* Reset button */
-        .reset-btn {
-            margin-top: 24px;
-            padding: 10px 32px;
-            font-size: 13px;
-            font-weight: 500;
-            font-family: 'Inter', sans-serif;
-            color: var(--text-secondary);
-            background: transparent;
-            border: 1px solid var(--border-subtle);
-            border-radius: 50px;
-            cursor: pointer;
-            transition: all 0.3s;
+        .results-panel.active {
             display: block;
-            margin-left: auto;
-            margin-right: auto;
+        }
+        
+        .results-header {
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid var(--border-light);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
         }
 
-        .reset-btn:hover {
-            color: var(--text-primary);
-            border-color: var(--accent-purple);
-            background: rgba(139, 92, 246, 0.08);
+        .results-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-main);
         }
 
-        /* Footer */
-        .footer {
-            margin-top: auto;
-            padding-top: 48px;
-            text-align: center;
+        .confidence-badge {
+            background: var(--success-green);
+            color: #FFF;
+            padding: 4px 10px;
+            border-radius: 20px;
             font-size: 12px;
-            color: var(--text-muted);
+            font-weight: 700;
         }
 
-        .footer a {
-            color: var(--accent-purple);
-            text-decoration: none;
+        /* Data Readout */
+        .data-readout {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
         }
 
-        /* Error state */
-        .error-msg {
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px solid rgba(239, 68, 68, 0.2);
-            border-radius: var(--radius-md);
-            padding: 12px 16px;
-            color: #fca5a5;
+        .classification-result {
+            background: var(--primary-light);
+            border-left: 4px solid var(--primary-blue);
+            padding: 20px;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .class-label {
+            font-size: 12px;
+            color: var(--primary-blue);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+
+        .class-value {
+            font-size: 26px;
+            font-weight: 700;
+            color: var(--text-main);
+            text-transform: capitalize;
+        }
+
+        /* Metrics Grid */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+
+        .metric-card {
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            padding: 16px;
+            background: #FFF;
+            text-align: center;
+        }
+
+        .metric-name {
             font-size: 13px;
-            margin-top: 16px;
+            color: var(--text-muted);
+            font-weight: 500;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        .metric-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .metric-unit {
+            font-size: 14px;
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+
+        /* Error Label */
+        .error-label {
+            color: #DE350B;
+            background: #FFEBE6;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            margin-top: 20px;
             display: none;
             text-align: center;
-        }
-
-        .error-msg.visible { display: block; }
-
-        /* Animations */
-        @keyframes fadeInDown {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+            width: 100%;
+            max-width: 500px;
         }
 
         /* Responsive */
         @media (max-width: 600px) {
-            .app-container { padding: 24px 16px 40px; }
-            .header__title { font-size: 24px; }
-            .header__subtitle { font-size: 13px; }
-            .upload-zone { padding: 36px 20px; }
-            .upload-zone__icon { width: 56px; height: 56px; font-size: 26px; }
-            .nutrition-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-            .nutrient-card { padding: 14px; }
-            .nutrient-card__value { font-size: 22px; }
-            .food-card__name { font-size: 22px; }
+            .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+            .header { padding: 24px 20px; }
+            .diagnostic-zone { padding: 30px 20px; }
         }
     </style>
 </head>
 <body>
-    <div class="app-container">
+
+    <div class="container">
         <!-- Header -->
         <header class="header">
-            <div class="header__logo">
-                <div class="header__icon">🍽️</div>
-                <h1 class="header__title">NutriScan</h1>
+            <div class="header-brand">
+                <div class="header-title">
+                    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+                    NutriVision
+                </div>
+                <div class="header-subtitle">Automated Dietary Assessment System • IEEE V1.0</div>
             </div>
-            <p class="header__subtitle">Upload a food photo and get instant AI-powered nutritional analysis</p>
         </header>
 
-        <!-- Upload Zone -->
-        <div class="upload-zone" id="upload-zone" onclick="document.getElementById('image-input').click()">
-            <div class="upload-zone__icon">📷</div>
-            <p class="upload-zone__text">Drop your food image here</p>
-            <p class="upload-zone__hint">or <span>browse files</span> · JPG, PNG, WEBP</p>
-            <img id="image-preview" alt="Food preview">
-            <input type="file" id="image-input" accept="image/*" onchange="handleImageSelect(event)">
-        </div>
-
-        <!-- Error Message -->
-        <div class="error-msg" id="error-msg"></div>
-
-        <!-- Analyze Button -->
-        <button class="analyze-btn" id="analyze-btn" onclick="classifyImage()">
-            <span class="btn-text">✨ Analyze Food</span>
-            <span class="btn-loading-text">Analyzing...</span>
-            <div class="spinner"></div>
-        </button>
-
-        <!-- Results -->
-        <div class="results" id="results">
-            <div class="food-card">
-                <div class="food-card__label">Detected Food</div>
-                <div class="food-card__name" id="food-name">—</div>
+        <!-- Main Body -->
+        <div class="diagnostic-zone">
+            
+            <!-- Upload Area -->
+            <div class="upload-container" id="upload-box" onclick="document.getElementById('file-input').click()">
+                <div class="upload-icon">⎘</div>
+                <div class="upload-text">Select Image for Analysis</div>
+                <div class="upload-subtext">Supports JPEG, PNG, WEBP (Max 5MB)</div>
+                <input type="file" id="file-input" accept="image/*">
             </div>
 
-            <div class="nutrition-grid">
-                <div class="nutrient-card nutrient-card--calories">
-                    <div class="nutrient-card__header">
-                        <div class="nutrient-card__icon">🔥</div>
-                        <span class="nutrient-card__label">Calories</span>
-                    </div>
-                    <div>
-                        <span class="nutrient-card__value" id="val-calories">0</span>
-                        <span class="nutrient-card__unit">kcal</span>
-                    </div>
-                    <div class="nutrient-card__bar"><div class="nutrient-card__bar-fill" id="bar-calories"></div></div>
+            <!-- Preview Area -->
+            <div class="preview-box" id="preview-box">
+                <button class="reselect-btn" onclick="resetUI()">Change Input</button>
+                <img id="image-preview" src="" alt="Input Specimen">
+            </div>
+
+            <!-- Error Output -->
+            <div class="error-label" id="error-alert"></div>
+
+            <!-- Analyze Button -->
+            <button class="action-btn" id="analyze-btn" onclick="executeInference()">
+                <span>Run CNN Inference</span>
+                <div class="spinner"></div>
+            </button>
+
+            <!-- Analysis Results -->
+            <div class="results-panel" id="results-panel">
+                <div class="results-header">
+                    <div class="results-title">Diagnostic Results</div>
+                    <div class="confidence-badge" id="confidence-score">99.9% Conf</div>
                 </div>
 
-                <div class="nutrient-card nutrient-card--protein">
-                    <div class="nutrient-card__header">
-                        <div class="nutrient-card__icon">💪</div>
-                        <span class="nutrient-card__label">Protein</span>
+                <div class="data-readout">
+                    <div class="classification-result">
+                        <div class="class-label">Predicted Class</div>
+                        <div class="class-value" id="result-class">Initializing...</div>
                     </div>
-                    <div>
-                        <span class="nutrient-card__value" id="val-protein">0</span>
-                        <span class="nutrient-card__unit">g</span>
-                    </div>
-                    <div class="nutrient-card__bar"><div class="nutrient-card__bar-fill" id="bar-protein"></div></div>
-                </div>
 
-                <div class="nutrient-card nutrient-card--carbs">
-                    <div class="nutrient-card__header">
-                        <div class="nutrient-card__icon">⚡</div>
-                        <span class="nutrient-card__label">Carbs</span>
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-name">Energy</div>
+                            <div class="metric-value"><span id="val-cal">0</span><span class="metric-unit"> kcal</span></div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-name">Proteins</div>
+                            <div class="metric-value"><span id="val-pro">0</span><span class="metric-unit"> g</span></div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-name">Carbs</div>
+                            <div class="metric-value"><span id="val-carb">0</span><span class="metric-unit"> g</span></div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-name">Fats</div>
+                            <div class="metric-value"><span id="val-fat">0</span><span class="metric-unit"> g</span></div>
+                        </div>
                     </div>
-                    <div>
-                        <span class="nutrient-card__value" id="val-carbs">0</span>
-                        <span class="nutrient-card__unit">g</span>
-                    </div>
-                    <div class="nutrient-card__bar"><div class="nutrient-card__bar-fill" id="bar-carbs"></div></div>
-                </div>
-
-                <div class="nutrient-card nutrient-card--fat">
-                    <div class="nutrient-card__header">
-                        <div class="nutrient-card__icon">🥑</div>
-                        <span class="nutrient-card__label">Fat</span>
-                    </div>
-                    <div>
-                        <span class="nutrient-card__value" id="val-fat">0</span>
-                        <span class="nutrient-card__unit">g</span>
-                    </div>
-                    <div class="nutrient-card__bar"><div class="nutrient-card__bar-fill" id="bar-fat"></div></div>
                 </div>
             </div>
 
-            <button class="reset-btn" onclick="resetAll()">↻ Analyze Another</button>
         </div>
-
-        <!-- Footer -->
-        <footer class="footer">
-            <p>Powered by AI · Built with TensorFlow & Flask</p>
-        </footer>
     </div>
 
     <script>
-        const uploadZone = document.getElementById('upload-zone');
-        const imageInput = document.getElementById('image-input');
+        const fileInput = document.getElementById('file-input');
+        const uploadBox = document.getElementById('upload-box');
+        const previewBox = document.getElementById('preview-box');
         const imagePreview = document.getElementById('image-preview');
         const analyzeBtn = document.getElementById('analyze-btn');
-        const resultsDiv = document.getElementById('results');
-        const errorMsg = document.getElementById('error-msg');
+        const resultsPanel = document.getElementById('results-panel');
+        const errorAlert = document.getElementById('error-alert');
 
-        // Drag & Drop
-        ['dragenter', 'dragover'].forEach(evt => {
-            uploadZone.addEventListener(evt, e => {
-                e.preventDefault();
-                uploadZone.classList.add('drag-over');
-            });
+        // Drag and drop mechanics
+        uploadBox.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadBox.classList.add('dragover');
         });
-
-        ['dragleave', 'drop'].forEach(evt => {
-            uploadZone.addEventListener(evt, e => {
-                e.preventDefault();
-                uploadZone.classList.remove('drag-over');
-            });
+        uploadBox.addEventListener('dragleave', () => {
+            uploadBox.classList.remove('dragover');
         });
-
-        uploadZone.addEventListener('drop', e => {
-            const file = e.dataTransfer.files[0];
-            if (file && file.type.startsWith('image/')) {
-                imageInput.files = e.dataTransfer.files;
-                showPreview(file);
+        uploadBox.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadBox.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                fileInput.files = e.dataTransfer.files;
+                mountImage();
             }
         });
+        fileInput.addEventListener('change', mountImage);
 
-        function handleImageSelect(event) {
-            const file = event.target.files[0];
-            if (file) showPreview(file);
-        }
+        function mountImage() {
+            const file = fileInput.files[0];
+            if (!file) return;
 
-        function showPreview(file) {
             const reader = new FileReader();
-            reader.onload = e => {
+            reader.onload = (e) => {
                 imagePreview.src = e.target.result;
-                uploadZone.classList.add('has-image');
-                analyzeBtn.classList.add('visible');
-                resultsDiv.classList.remove('visible');
-                errorMsg.classList.remove('visible');
+                uploadBox.style.display = 'none';
+                previewBox.style.display = 'block';
+                analyzeBtn.style.display = 'flex';
+                resultsPanel.classList.remove('active');
+                errorAlert.style.display = 'none';
             };
             reader.readAsDataURL(file);
         }
 
-        function classifyImage() {
-            const file = imageInput.files[0];
-            if (!file) {
-                showError('Please select a food image first.');
-                return;
-            }
+        function resetUI() {
+            fileInput.value = '';
+            uploadBox.style.display = 'block';
+            previewBox.style.display = 'none';
+            analyzeBtn.style.display = 'none';
+            resultsPanel.classList.remove('active');
+            errorAlert.style.display = 'none';
+        }
 
-            const btn = analyzeBtn;
-            btn.classList.add('loading');
-            btn.disabled = true;
-            errorMsg.classList.remove('visible');
+        function executeInference() {
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            analyzeBtn.classList.add('loading');
+            analyzeBtn.disabled = true;
+            errorAlert.style.display = 'none';
 
             const formData = new FormData();
             formData.append('image', file);
 
             fetch('/classify', {
                 method: 'POST',
-                body: formData,
+                body: formData
             })
-            .then(res => {
-                if (!res.ok) throw new Error('Classification failed');
-                return res.json();
-            })
-            .then(data => {
-                btn.classList.remove('loading');
-                btn.disabled = false;
+            .then(res => res.json().then(data => ({ status: res.status, body: data })))
+            .then(({ status, body }) => {
+                analyzeBtn.classList.remove('loading');
+                analyzeBtn.disabled = false;
 
-                // Display food name
-                const name = data.class.replace(/_/g, ' ');
-                document.getElementById('food-name').textContent = name;
+                if (status !== 200) {
+                    throw new Error(body.error || 'Inference engine failed. Is the model loaded?');
+                }
 
-                // Display nutrients with animation
-                const nutrients = data.nutrients;
-                animateValue('val-calories', nutrients.calories || 0);
-                animateValue('val-protein', nutrients.protein || 0);
-                animateValue('val-carbs', nutrients.carbs || 0);
-                animateValue('val-fat', nutrients.fat || 0);
+                // Inject Data
+                document.getElementById('result-class').textContent = body.class.replace(/_/g, ' ');
+                document.getElementById('confidence-score').textContent = body.confidence + '% Conf';
+                
+                // Animate Numbers
+                animateNumber('val-cal', body.nutrients.calories || 0);
+                animateNumber('val-pro', body.nutrients.protein || 0);
+                animateNumber('val-carb', body.nutrients.carbs || 0);
+                animateNumber('val-fat', body.nutrients.fat || 0);
 
-                // Animate bars (percentage based on daily values)
-                setTimeout(() => {
-                    document.getElementById('bar-calories').style.width = Math.min((nutrients.calories || 0) / 800 * 100, 100) + '%';
-                    document.getElementById('bar-protein').style.width = Math.min((nutrients.protein || 0) / 50 * 100, 100) + '%';
-                    document.getElementById('bar-carbs').style.width = Math.min((nutrients.carbs || 0) / 100 * 100, 100) + '%';
-                    document.getElementById('bar-fat').style.width = Math.min((nutrients.fat || 0) / 65 * 100, 100) + '%';
-                }, 100);
-
-                resultsDiv.classList.add('visible');
-                analyzeBtn.classList.remove('visible');
+                // Hide button, show results
+                analyzeBtn.style.display = 'none';
+                resultsPanel.classList.add('active');
             })
             .catch(err => {
-                btn.classList.remove('loading');
-                btn.disabled = false;
-                showError('Something went wrong. Please try again.');
-                console.error(err);
+                analyzeBtn.classList.remove('loading');
+                analyzeBtn.disabled = false;
+                errorAlert.textContent = err.message;
+                errorAlert.style.display = 'block';
             });
         }
 
-        function animateValue(id, target) {
+        function animateNumber(id, endVal) {
             const el = document.getElementById(id);
-            const duration = 800;
-            const start = performance.now();
-            const initial = 0;
+            const duration = 1000;
+            let startVal = 0;
+            const startTime = performance.now();
 
-            function update(now) {
-                const elapsed = now - start;
+            function step(currentTime) {
+                const elapsed = currentTime - startTime;
                 const progress = Math.min(elapsed / duration, 1);
-                const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
-                el.textContent = Math.round(initial + (target - initial) * eased);
-                if (progress < 1) requestAnimationFrame(update);
+                // Ease out expo
+                const easeOut = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
+                el.textContent = Math.round(startVal + (endVal - startVal) * easeOut);
+                
+                if (progress < 1) requestAnimationFrame(step);
             }
-            requestAnimationFrame(update);
-        }
-
-        function showError(msg) {
-            errorMsg.textContent = msg;
-            errorMsg.classList.add('visible');
-        }
-
-        function resetAll() {
-            imageInput.value = '';
-            imagePreview.src = '';
-            uploadZone.classList.remove('has-image');
-            analyzeBtn.classList.remove('visible');
-            resultsDiv.classList.remove('visible');
-            errorMsg.classList.remove('visible');
-
-            // Reset bars
-            document.getElementById('bar-calories').style.width = '0%';
-            document.getElementById('bar-protein').style.width = '0%';
-            document.getElementById('bar-carbs').style.width = '0%';
-            document.getElementById('bar-fat').style.width = '0%';
+            requestAnimationFrame(step);
         }
     </script>
 </body>
