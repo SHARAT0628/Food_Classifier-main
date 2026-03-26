@@ -193,7 +193,7 @@ def classify_image():
 
         img = Image.open(file.stream).convert('RGB')
         img = img.resize(TARGET_SIZE)
-        img_array = np.array(img) / 255.0
+        img_array = np.array(img)
         img_array = np.expand_dims(img_array, axis=0)
 
         prediction = model.predict(img_array)
