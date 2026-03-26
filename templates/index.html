@@ -337,6 +337,50 @@
             max-width: 500px;
         }
 
+        /* Low Confidence Warning */
+        .low-confidence-warning {
+            display: none;
+            background: linear-gradient(135deg, #FFF8E1, #FFF3CD);
+            border: 2px solid #FFB300;
+            border-radius: 10px;
+            padding: 24px;
+            text-align: center;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        .low-confidence-warning.active {
+            display: block;
+        }
+
+        .warning-icon {
+            font-size: 40px;
+            margin-bottom: 10px;
+        }
+
+        .warning-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #E65100;
+            margin-bottom: 6px;
+        }
+
+        .warning-text {
+            font-size: 14px;
+            color: #795548;
+            line-height: 1.5;
+        }
+
+        .warning-confidence {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 4px 12px;
+            background: rgba(255, 179, 0, 0.2);
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            color: #E65100;
+        }
+
         /* Quantity Control */
         .quantity-control {
             background: #F8FAFC;
@@ -533,7 +577,15 @@
                     <div class="confidence-badge" id="confidence-score">99.9% Conf</div>
                 </div>
 
-                <div class="data-readout">
+                <!-- Low Confidence Warning -->
+                <div class="low-confidence-warning" id="low-confidence-warning">
+                    <div class="warning-icon">⚠️</div>
+                    <div class="warning-title">Not a Recognized Food Item</div>
+                    <div class="warning-text">The uploaded image doesn't appear to be a food item, or the model couldn't identify it with enough certainty. Please try uploading a clear image of a food item.</div>
+                    <div class="warning-confidence" id="warning-confidence-value">Confidence: 0%</div>
+                </div>
+
+                <div class="data-readout" id="data-readout">
                     <div class="classification-result">
                         <div class="class-label">Predicted Class</div>
                         <div class="class-value" id="result-class">Initializing...</div>
@@ -709,25 +761,44 @@
                     throw new Error(body.error || 'Inference engine failed. Is the model loaded?');
                 }
 
-                // Store base nutrition values and serving size
-                baseNutrients = {
-                    calories: body.nutrients.calories || 0,
-                    protein: body.nutrients.protein || 0,
-                    carbs: body.nutrients.carbs || 0,
-                    fat: body.nutrients.fat || 0
-                };
-                currentServingSize = body.nutrients.serving_size || 100;
+                const CONFIDENCE_THRESHOLD = 50;
+                const lowConfWarning = document.getElementById('low-confidence-warning');
+                const dataReadout = document.getElementById('data-readout');
 
-                // Update serving label & preset button text
-                servingLabel.textContent = 'Standard serving: ' + currentServingSize + 'g';
-                document.getElementById('preset-serving').textContent = 'Per Serving (' + currentServingSize + 'g)';
-
-                // Inject classification data
-                document.getElementById('result-class').textContent = body.class.replace(/_/g, ' ');
+                // Inject confidence badge
                 document.getElementById('confidence-score').textContent = body.confidence + '% Conf';
 
-                // Default to "Per 100g" view
-                setQuantity(100, document.getElementById('preset-100g'));
+                if (body.confidence < CONFIDENCE_THRESHOLD) {
+                    // Low confidence — show warning, hide nutrition data
+                    lowConfWarning.classList.add('active');
+                    dataReadout.style.display = 'none';
+                    document.getElementById('warning-confidence-value').textContent = 'Confidence: ' + body.confidence + '%';
+                    document.getElementById('confidence-score').style.background = '#FF8F00';
+                } else {
+                    // Good confidence — show results normally
+                    lowConfWarning.classList.remove('active');
+                    dataReadout.style.display = 'flex';
+                    document.getElementById('confidence-score').style.background = '';
+
+                    // Store base nutrition values and serving size
+                    baseNutrients = {
+                        calories: body.nutrients.calories || 0,
+                        protein: body.nutrients.protein || 0,
+                        carbs: body.nutrients.carbs || 0,
+                        fat: body.nutrients.fat || 0
+                    };
+                    currentServingSize = body.nutrients.serving_size || 100;
+
+                    // Update serving label & preset button text
+                    servingLabel.textContent = 'Standard serving: ' + currentServingSize + 'g';
+                    document.getElementById('preset-serving').textContent = 'Per Serving (' + currentServingSize + 'g)';
+
+                    // Inject classification data
+                    document.getElementById('result-class').textContent = body.class.replace(/_/g, ' ');
+
+                    // Default to "Per 100g" view
+                    setQuantity(100, document.getElementById('preset-100g'));
+                }
 
                 // Hide button, show results
                 analyzeBtn.style.display = 'none';
