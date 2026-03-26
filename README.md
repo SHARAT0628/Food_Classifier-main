@@ -9,38 +9,41 @@
 * **High-Efficiency Transfer Learning:** Extracts features via ImageNet weights and systematically fine-tunes custom projection kernels across 243 functional layers using a dual-phase training protocol.
 * **Academic Glassmorphism Interface:** Integrates a clinical, responsive Flask frontend for real-time model invocation, nutritional mapping, and diagnostic readout formatting.
 
-## 🛠 Project Architecture
-NutriVision abandons exhaustive static memory allocation for an active runtime pipeline.
-1. **Inputs:** `(224, 224, 3)` Tensors dynamically loaded by a sequential disk streamer.
-2. **Backbone:** Convolutional `EfficientNetB0` executing standard internal `Rescaling(1./255)` blocks against pure byte-level inputs.
-3. **Classification Head:** 
-    - `GlobalAveragePooling2D`
-    - Dual `Dropout(0.3)` layers wrapping a high-capacity `Dense(512)` matrix.
-    - Softmax `Dense(136)` multi-regional classifier payload.
-
 ## 📁 Repository Structure
 ```text
 ├── app.py                       # Flask Inference Server & UI Engine
 ├── train_model_optimized.py     # Fault-Tolerant Training Mechanics
-├── model/                       # Dynamically Saved Weights & Mapping (.keras)
+├── model/                       # [IGNORED BY GIT] Dynamic Weights (.keras)
 ├── templates/                   # Frontend UI components (index.html)
-└── research/                    # Extensive IEEE specifications and diagrams
+└── requirements.txt             # Dependency Definitions
 ```
 
-## 🧠 Academic Context (IEEE Access)
-This repository contains the codebase utilized for compiling empirical calculations, parameter depth, and dataset processing formulas designed for academic publication. You can locate explicitly structured diagrams, table formatting, and methodologies strictly within the `research/` directory.
+## 🚀 Quick Start (GitHub Deployment)
 
-## 🚀 Quick Start
+To run this application on a new system utilizing our GitHub codebase, please closely follow these instructions. 
+> **⚠️ CRITICAL:** To bypass harsh Git capacity limits, the Neural Network parameters (`model/food_classifier_combined.keras`) and the 6GB raw image datasets are **intentionally ignored** via `.gitignore`. 
 
-### 1. Training the Convolutional Framework
-Ensure your datasets are downloaded and extracted into the `food-101/` and `food-35/` folders. Then, launch the memory-efficient streaming pipeline:
+### Step 1: Clone the Repository
+Open a terminal on the deployment system and execute:
 ```bash
-python train_model_optimized.py
+git clone https://github.com/SHARAT0628/Food_Classifier-main.git
+cd Food_Classifier-main
 ```
 
-### 2. Launching the Diagnostics Server
-Once the combined checkpoint (`model/food_classifier_combined.keras`) exists, launch the visual inference tool:
+### Step 2: Manually Inject the Model
+Since GitHub strictly filters dense binary matrices, you must manually introduce the generated model weights:
+1. Ensure you have copied the explicitly trained `model/` folder (containing the `.keras` model and JSON mappings) from your host computer via an external drive.
+2. Paste the `model/` folder directly into the root directory of the freshly cloned repository (right next to `app.py`).
+
+### Step 3: Install Dependencies
+The application requires specific Python machine-learning parameters. Run:
+```bash
+pip install -r requirements.txt
+```
+
+### Step 4: Launch the Interface
+Boot the diagnostic web inference server:
 ```bash
 python app.py
 ```
-Navigate to `http://127.0.0.1:5000` to utilize the diagnostic interface.
+Finally, access `http://127.0.0.1:5000` via any standard browser to upload images and utilize the diagnostic GUI!
