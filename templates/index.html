@@ -528,6 +528,34 @@
             .quantity-slider-wrap { min-width: 100%; order: 3; }
             .quantity-presets { flex-wrap: wrap; }
         }
+
+        /* Multi-item styles */
+        .multi-item-list {
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .food-item-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: #FFF;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+        }
+
+        .food-item-card:hover { border-color: var(--primary-blue); background: var(--primary-light); }
+        .food-item-card.active { border-color: var(--primary-blue); background: var(--primary-blue); color: #FFF; }
+        .food-item-card.active .item-conf { color: rgba(255,255,255,0.8); }
+
+        .item-info { display: flex; flex-direction: column; }
+        .item-name { font-weight: 600; text-transform: capitalize; }
+        .item-conf { font-size: 11px; color: var(--text-muted); }
     </style>
 </head>
 <body>
@@ -586,7 +614,10 @@
                 </div>
 
                 <div class="data-readout" id="data-readout">
-                    <div class="classification-result">
+                    <!-- Results Area (Dynamic) -->
+                    <div id="multi-item-container" class="multi-item-list"></div>
+
+                    <div class="classification-result" id="single-item-result">
                         <div class="class-label">Predicted Class</div>
                         <div class="class-value" id="result-class">Initializing...</div>
                     </div>
@@ -651,29 +682,18 @@
         const quantitySlider = document.getElementById('quantity-slider');
         const servingLabel = document.getElementById('serving-label');
 
-        // Base nutrition values (per serving) from API
         let baseNutrients = { calories: 0, protein: 0, carbs: 0, fat: 0 };
-        let currentServingSize = 100; // will be updated from API response
+        let currentServingSize = 100;
 
-        // Drag and drop mechanics
-        uploadBox.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadBox.classList.add('dragover');
-        });
-        uploadBox.addEventListener('dragleave', () => {
-            uploadBox.classList.remove('dragover');
-        });
+        uploadBox.addEventListener('dragover', (e) => { e.preventDefault(); uploadBox.classList.add('dragover'); });
+        uploadBox.addEventListener('dragleave', () => { uploadBox.classList.remove('dragover'); });
         uploadBox.addEventListener('drop', (e) => {
             e.preventDefault();
             uploadBox.classList.remove('dragover');
-            if (e.dataTransfer.files.length > 0) {
-                fileInput.files = e.dataTransfer.files;
-                mountImage();
-            }
+            if (e.dataTransfer.files.length > 0) { fileInput.files = e.dataTransfer.files; mountImage(); }
         });
         fileInput.addEventListener('change', mountImage);
 
-        // Quantity controls — sync slider ↔ input
         quantitySlider.addEventListener('input', () => {
             quantityInput.value = quantitySlider.value;
             updateNutrition(parseInt(quantitySlider.value));
@@ -692,20 +712,15 @@
             quantityInput.value = grams;
             quantitySlider.value = grams;
             updateNutrition(grams);
-
-            // Highlight active preset
             document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
             if (btnEl) btnEl.classList.add('active');
         }
 
-        function clearPresetActive() {
-            document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-        }
+        function clearPresetActive() { document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active')); }
 
         function updateNutrition(quantity) {
             if (currentServingSize <= 0) return;
             const scale = quantity / currentServingSize;
-
             animateNumber('val-cal', Math.round(baseNutrients.calories * scale));
             animateNumber('val-pro', Math.round(baseNutrients.protein * scale));
             animateNumber('val-carb', Math.round(baseNutrients.carbs * scale));
@@ -715,7 +730,6 @@
         function mountImage() {
             const file = fileInput.files[0];
             if (!file) return;
-
             const reader = new FileReader();
             reader.onload = (e) => {
                 imagePreview.src = e.target.result;
@@ -748,59 +762,58 @@
             const formData = new FormData();
             formData.append('image', file);
 
-            fetch('/classify', {
-                method: 'POST',
-                body: formData
-            })
+            fetch('/classify', { method: 'POST', body: formData })
             .then(res => res.json().then(data => ({ status: res.status, body: data })))
             .then(({ status, body }) => {
                 analyzeBtn.classList.remove('loading');
                 analyzeBtn.disabled = false;
 
-                if (status !== 200) {
-                    throw new Error(body.error || 'Inference engine failed. Is the model loaded?');
-                }
+                if (status !== 200) throw new Error(body.error || 'Inference engine failed.');
 
-                const CONFIDENCE_THRESHOLD = 50;
                 const lowConfWarning = document.getElementById('low-confidence-warning');
                 const dataReadout = document.getElementById('data-readout');
 
-                // Inject confidence badge
-                document.getElementById('confidence-score').textContent = body.confidence + '% Conf';
-
-                if (body.confidence < CONFIDENCE_THRESHOLD) {
-                    // Low confidence — show warning, hide nutrition data
-                    lowConfWarning.classList.add('active');
-                    dataReadout.style.display = 'none';
-                    document.getElementById('warning-confidence-value').textContent = 'Confidence: ' + body.confidence + '%';
-                    document.getElementById('confidence-score').style.background = '#FF8F00';
-                } else {
-                    // Good confidence — show results normally
+                if (body.is_multi) {
                     lowConfWarning.classList.remove('active');
                     dataReadout.style.display = 'flex';
-                    document.getElementById('confidence-score').style.background = '';
-
-                    // Store base nutrition values and serving size
-                    baseNutrients = {
-                        calories: body.nutrients.calories || 0,
-                        protein: body.nutrients.protein || 0,
-                        carbs: body.nutrients.carbs || 0,
-                        fat: body.nutrients.fat || 0
-                    };
-                    currentServingSize = body.nutrients.serving_size || 100;
-
-                    // Update serving label & preset button text
-                    servingLabel.textContent = 'Standard serving: ' + currentServingSize + 'g';
-                    document.getElementById('preset-serving').textContent = 'Per Serving (' + currentServingSize + 'g)';
-
-                    // Inject classification data
-                    document.getElementById('result-class').textContent = body.class.replace(/_/g, ' ');
-
-                    // Default to "Per 100g" view
-                    setQuantity(100, document.getElementById('preset-100g'));
+                    document.getElementById('single-item-result').style.display = 'none';
+                    const listContainer = document.getElementById('multi-item-container');
+                    listContainer.style.display = 'flex';
+                    listContainer.innerHTML = '';
+                    
+                    body.items.forEach((item, idx) => {
+                        const card = document.createElement('div');
+                        card.className = 'food-item-card' + (idx === 0 ? ' active' : '');
+                        card.innerHTML = `
+                            <div class="item-info">
+                                <div class="item-name">${item.class.replace(/_/g, ' ')}</div>
+                                <div class="item-conf">${item.confidence}% confidence</div>
+                            </div>
+                            <div class="item-arrow">→</div>
+                        `;
+                        card.onclick = () => {
+                            document.querySelectorAll('.food-item-card').forEach(c => c.classList.remove('active'));
+                            card.classList.add('active');
+                            displayNutrients(item);
+                        };
+                        listContainer.appendChild(card);
+                    });
+                    displayNutrients(body.items[0]);
+                } else {
+                    document.getElementById('multi-item-container').style.display = 'none';
+                    document.getElementById('single-item-result').style.display = 'block';
+                    if (body.confidence < 50) {
+                        lowConfWarning.classList.add('active');
+                        dataReadout.style.display = 'none';
+                        document.getElementById('warning-confidence-value').textContent = 'Confidence: ' + body.confidence + '%';
+                        document.getElementById('confidence-score').style.background = '#FF8F00';
+                    } else {
+                        lowConfWarning.classList.remove('active');
+                        dataReadout.style.display = 'flex';
+                        document.getElementById('confidence-score').style.background = '';
+                        displayNutrients(body);
+                    }
                 }
-
-                // Hide button, show results
                 analyzeBtn.style.display = 'none';
                 resultsPanel.classList.add('active');
             })
@@ -812,19 +825,32 @@
             });
         }
 
+        function displayNutrients(data) {
+            baseNutrients = {
+                calories: data.nutrients.calories || 0,
+                protein: data.nutrients.protein || 0,
+                carbs: data.nutrients.carbs || 0,
+                fat: data.nutrients.fat || 0
+            };
+            currentServingSize = data.nutrients.serving_size || 100;
+            servingLabel.textContent = 'Standard serving: ' + currentServingSize + 'g';
+            document.getElementById('preset-serving').textContent = 'Per Serving (' + currentServingSize + 'g)';
+            const resultClass = document.getElementById('result-class');
+            if (resultClass) resultClass.textContent = data.class.replace(/_/g, ' ');
+            document.getElementById('confidence-score').textContent = data.confidence + '% Conf';
+            setQuantity(100, document.getElementById('preset-100g'));
+        }
+
         function animateNumber(id, endVal) {
             const el = document.getElementById(id);
             const duration = 600;
             const startVal = parseInt(el.textContent) || 0;
             const startTime = performance.now();
-
             function step(currentTime) {
                 const elapsed = currentTime - startTime;
                 const progress = Math.min(elapsed / duration, 1);
-                // Ease out expo
                 const easeOut = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
                 el.textContent = Math.round(startVal + (endVal - startVal) * easeOut);
-                
                 if (progress < 1) requestAnimationFrame(step);
             }
             requestAnimationFrame(step);

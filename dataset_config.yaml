@@ -1,0 +1,70 @@
+path: ./datasets/food_data # Dataset root
+train: images/train # Train images (relative to 'path')
+val: images/val # Val images (relative to 'path')
+test: images/test # Test images (optional)
+
+# Number of classes
+nc: 60
+
+# Class names (The most common 60 Indian and Global dishes)
+names:
+  0: adal_makhani
+  1: aloo_gobi
+  2: apple
+  3: banana
+  4: biryani
+  5: burger
+  6: butter_chicken
+  7: cake
+  8: carrot
+  9: chana_masala
+  10: chicken_tikka
+  11: coffee
+  12: cookie
+  13: croissant
+  14: cucumber
+  15: dal_tadka
+  16: dhokla
+  17: dosa
+  18: egg_curry
+  19: fish_curry
+  20: french_fries
+  21: fruit_juice
+  22: grapes
+  23: gulab_jamun
+  24: ice_cream
+  25: idli
+  26: jalebi
+  27: kheer
+  28: lassi
+  29: mango
+  30: masala_chai
+  31: muffin
+  32: naan
+  33: omelette
+  34: onion
+  35: pakora
+  36: pancake
+  37: paneer_butter_masala
+  38: pani_puri
+  39: paratha
+  40: pasta
+  41: pav_bhaji
+  42: plain_rice
+  43: poha
+  44: pulao
+  45: rasgulla
+  46: roti
+  47: salad
+  48: sambar
+  49: samosa
+  50: sandwich
+  51: soda
+  52: strawberry
+  53: tomato
+  54: vada
+  55: vada_pav
+  56: waffle
+  57: pizza
+  58: broccoli
+  59: steak

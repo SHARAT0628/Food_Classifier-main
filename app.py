@@ -1,6 +1,11 @@
 from flask import Flask, request, jsonify, render_template
 import numpy as np
 from PIL import Image
+try:
+    from ultralytics import YOLO
+    HAS_YOLO = True
+except ImportError:
+    HAS_YOLO = False
 from keras._tf_keras.keras.models import load_model
 import os
 import json
@@ -8,34 +13,34 @@ import json
 app = Flask(__name__)
 
 # ── Model loading ────────────────────────────────────────────────────
-# Try combined model first, fallback to old model
-MODEL_PATH = 'model/food_classifier_combined.keras'
+# Priority: 1. YOLO (Multi-food) -> 2. Combined Keras -> 3. Old Keras
+MODEL_YOLO_PATH = 'model/best.pt'
+MODEL_KERAS_PATH = 'model/food_classifier_combined.keras'
 CATEGORIES_PATH = 'model/categories.json'
 
-if os.path.exists(MODEL_PATH) and os.path.exists(CATEGORIES_PATH):
-    model = load_model(MODEL_PATH)
+yolo_model = None
+keras_model = None
+CATEGORIES = []
+
+# Load YOLO if available
+if HAS_YOLO and os.path.exists(MODEL_YOLO_PATH):
+    yolo_model = YOLO(MODEL_YOLO_PATH)
+    print("[✓] Loaded YOLOv11 Multi-Food model")
+    # Categories are built into the .pt file for YOLO
+
+# Load Keras as fallback or primary if no YOLO
+if os.path.exists(MODEL_KERAS_PATH) and os.path.exists(CATEGORIES_PATH):
+    keras_model = load_model(MODEL_KERAS_PATH)
     with open(CATEGORIES_PATH, 'r') as f:
         CATEGORIES = json.load(f)
-    print(f"[✓] Loaded combined model with {len(CATEGORIES)} categories")
+    print(f"[✓] Loaded Keras model with {len(CATEGORIES)} categories")
 elif os.path.exists('model/fine_tuned_food_classifier.keras'):
-    model = load_model('model/fine_tuned_food_classifier.keras')
+    keras_model = load_model('model/fine_tuned_food_classifier.keras')
     CATEGORIES = ['apple_pie', 'cheesecake', 'chicken_curry', 'french_fries', 'fried_rice',
                   'hamburger', 'hot_dog', 'ice_cream', 'omelette', 'pizza', 'sushi']
-    print("[!] Using old fine-tuned model (11 categories)")
-elif os.path.exists('model/food_classifier.keras'):
-    model = load_model('model/food_classifier.keras')
-    CATEGORIES = ['apple_pie', 'cheesecake', 'chicken_curry', 'french_fries', 'fried_rice',
-                  'hamburger', 'hot_dog', 'ice_cream', 'omelette', 'pizza', 'sushi']
-    print("[!] Using old base model (11 categories)")
-elif os.path.exists('fine_tuned_food_classifier.keras'):
-    model = load_model('fine_tuned_food_classifier.keras')
-    CATEGORIES = ['apple_pie', 'cheesecake', 'chicken_curry', 'french_fries', 'fried_rice',
-                  'hamburger', 'hot_dog', 'ice_cream', 'omelette', 'pizza', 'sushi']
-    print("[!] Using fine-tuned model from root (11 categories)")
+    print("[!] Using old Keras model")
 else:
-    print("[✗] No model found! Train a model first with: python train_model.py")
-    model = None
-    CATEGORIES = []
+    print("[✗] No model found! Prepare 'model/best.pt' or 'model/food_classifier_combined.keras'")
 
 TARGET_SIZE = (224, 224)
 
@@ -174,6 +179,40 @@ NUTRIENTS = {
     'taco': {'calories': 280, 'protein': 14, 'carbs': 22, 'fat': 15, 'serving_size': 130},
     'taquito': {'calories': 220, 'protein': 8, 'carbs': 24, 'fat': 10, 'serving_size': 100},
     'burger': {'calories': 400, 'protein': 22, 'carbs': 30, 'fat': 22, 'serving_size': 200},
+    # --- New 60 Categories ---
+    'adal_makhani': {'calories': 230, 'protein': 9, 'carbs': 28, 'fat': 9, 'serving_size': 200},
+    'aloo_gobi': {'calories': 150, 'protein': 4, 'carbs': 18, 'fat': 8, 'serving_size': 200},
+    'apple': {'calories': 52, 'protein': 0.3, 'carbs': 14, 'fat': 0.2, 'serving_size': 100},
+    'banana': {'calories': 89, 'protein': 1.1, 'carbs': 23, 'fat': 0.3, 'serving_size': 100},
+    'biryani': {'calories': 450, 'protein': 20, 'carbs': 55, 'fat': 18, 'serving_size': 350},
+    'butter_chicken': {'calories': 350, 'protein': 25, 'carbs': 10, 'fat': 24, 'serving_size': 250},
+    'cake': {'calories': 350, 'protein': 4, 'carbs': 50, 'fat': 16, 'serving_size': 110},
+    'carrot': {'calories': 41, 'protein': 0.9, 'carbs': 10, 'fat': 0.2, 'serving_size': 100},
+    'chana_masala': {'calories': 200, 'protein': 10, 'carbs': 30, 'fat': 6, 'serving_size': 200},
+    'chicken_tikka': {'calories': 250, 'protein': 35, 'carbs': 5, 'fat': 10, 'serving_size': 200},
+    'coffee': {'calories': 2, 'protein': 0.1, 'carbs': 0, 'fat': 0, 'serving_size': 200},
+    'cookie': {'calories': 150, 'protein': 2, 'carbs': 20, 'fat': 7, 'serving_size': 30},
+    'croissant': {'calories': 230, 'protein': 5, 'carbs': 26, 'fat': 12, 'serving_size': 60},
+    'cucumber': {'calories': 15, 'protein': 0.7, 'carbs': 4, 'fat': 0.1, 'serving_size': 100},
+    'dal_tadka': {'calories': 180, 'protein': 8, 'carbs': 24, 'fat': 6, 'serving_size': 200},
+    'egg_curry': {'calories': 250, 'protein': 14, 'carbs': 8, 'fat': 18, 'serving_size': 200},
+    'fish_curry': {'calories': 200, 'protein': 22, 'carbs': 6, 'fat': 10, 'serving_size': 250},
+    'fruit_juice': {'calories': 110, 'protein': 1, 'carbs': 26, 'fat': 0, 'serving_size': 240},
+    'grapes': {'calories': 67, 'protein': 0.7, 'carbs': 18, 'fat': 0.4, 'serving_size': 100},
+    'ice_cream': {'calories': 210, 'protein': 4, 'carbs': 25, 'fat': 11, 'serving_size': 100},
+    'kheer': {'calories': 250, 'protein': 6, 'carbs': 40, 'fat': 8, 'serving_size': 150},
+    'lassi': {'calories': 150, 'protein': 5, 'carbs': 25, 'fat': 4, 'serving_size': 250},
+    'mango': {'calories': 60, 'protein': 0.8, 'carbs': 15, 'fat': 0.4, 'serving_size': 100},
+    'muffin': {'calories': 350, 'protein': 5, 'carbs': 50, 'fat': 15, 'serving_size': 100},
+    'pasta': {'calories': 300, 'protein': 12, 'carbs': 55, 'fat': 4, 'serving_size': 200},
+    'poha': {'calories': 180, 'protein': 4, 'carbs': 35, 'fat': 3, 'serving_size': 150},
+    'pulao': {'calories': 250, 'protein': 5, 'carbs': 45, 'fat': 6, 'serving_size': 200},
+    'soda': {'calories': 140, 'protein': 0, 'carbs': 35, 'fat': 0, 'serving_size': 355},
+    'strawberry': {'calories': 32, 'protein': 0.7, 'carbs': 8, 'fat': 0.3, 'serving_size': 100},
+    'tomato': {'calories': 18, 'protein': 0.9, 'carbs': 4, 'fat': 0.2, 'serving_size': 100},
+    'vada': {'calories': 150, 'protein': 4, 'carbs': 18, 'fat': 7, 'serving_size': 60},
+    'waffle': {'calories': 250, 'protein': 6, 'carbs': 35, 'fat': 10, 'serving_size': 100},
+    'broccoli': {'calories': 34, 'protein': 2.8, 'carbs': 7, 'fat': 0.4, 'serving_size': 100},
 }
 
 
@@ -184,7 +223,7 @@ def index():
 
 @app.route('/classify', methods=['POST'])
 def classify_image():
-    if model is None:
+    if yolo_model is None and keras_model is None:
         return jsonify({'error': 'No model loaded. Train a model first.'}), 500
 
     try:
@@ -193,24 +232,57 @@ def classify_image():
             return jsonify({'error': 'No image provided'}), 400
 
         img = Image.open(file.stream).convert('RGB')
-        img = img.resize(TARGET_SIZE)
-        img_array = np.array(img)
-        img_array = np.expand_dims(img_array, axis=0)
+        
+        # --- Case 1: YOLO Model (Multi-Object Detection) ---
+        if yolo_model:
+            results = yolo_model(img) # Inference
+            detections = []
+            
+            for r in results:
+                for box in r.boxes:
+                    cls_id = int(box.cls[0])
+                    label = yolo_model.names[cls_id]
+                    prob = float(box.conf[0])
+                    
+                    if prob > 0.25: # Confidence threshold
+                        nutrient_info = NUTRIENTS.get(label, {
+                            'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0
+                        })
+                        detections.append({
+                            'class': label,
+                            'confidence': round(prob * 100, 1),
+                            'nutrients': nutrient_info
+                        })
+            
+            if not detections:
+                return jsonify({'error': 'No food items detected'}), 404
+                
+            return jsonify({
+                'is_multi': True,
+                'items': detections
+            })
 
-        prediction = model.predict(img_array)
-        predicted_idx = np.argmax(prediction)
-        predicted_class = CATEGORIES[predicted_idx]
-        confidence = float(prediction[0][predicted_idx])
+        # --- Case 2: Keras Model (Single Classification Fallback) ---
+        else:
+            img_resized = img.resize(TARGET_SIZE)
+            img_array = np.array(img_resized)
+            img_array = np.expand_dims(img_array, axis=0)
 
-        nutrient_info = NUTRIENTS.get(predicted_class, {
-            'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0
-        })
+            prediction = keras_model.predict(img_array)
+            predicted_idx = np.argmax(prediction)
+            predicted_class = CATEGORIES[predicted_idx]
+            confidence = float(prediction[0][predicted_idx])
 
-        return jsonify({
-            'class': predicted_class,
-            'confidence': round(confidence * 100, 1),
-            'nutrients': nutrient_info
-        })
+            nutrient_info = NUTRIENTS.get(predicted_class, {
+                'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0
+            })
+
+            return jsonify({
+                'is_multi': False,
+                'class': predicted_class,
+                'confidence': round(confidence * 100, 1),
+                'nutrients': nutrient_info
+            })
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500

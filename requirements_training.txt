@@ -1,0 +1,20 @@
+# NutriVision v2 - Training Dependencies
+# For NVIDIA RTX 3050 (use CUDA 11.8 or 12.1 for best results)
+
+# Core Deep Learning
+torch
+torchvision
+torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# YOLO Framework
+ultralytics
+
+# Image/Video Processing
+opencv-python
+pillow
+numpy
+
+# Utilities
+roboflow
+pyyaml
+tqdm
