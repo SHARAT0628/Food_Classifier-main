@@ -9,284 +9,148 @@ except ImportError:
 from keras._tf_keras.keras.models import load_model
 import os
 import json
+import cv2
+import traceback
 
 app = Flask(__name__)
 
-# ── Model loading ────────────────────────────────────────────────────
-# Priority: 1. YOLO (Multi-food) -> 2. Combined Keras -> 3. Old Keras
+# -- Constants --
+STANDARD_PLATE_DIAMETER_CM = 25.4 
+DEFAULT_DENSITY = 0.8
+DEFAULT_THICKNESS = 2.0
+TARGET_SIZE = (224, 224)
+
+FOODSEG103_NAMES = [
+    "candy", "egg_tart", "french_fries", "chocolate", "biscuit", "popcorn", "pudding", "ice_cream", 
+    "cheese_butter", "cake", "wine", "milkshake", "coffee", "juice", "milk", "tea", "almond", 
+    "red_beans", "cashew", "dried_cranberries", "soy", "walnut", "peanut", "egg", "apple", 
+    "date", "apricot", "avocado", "banana", "strawberry", "cherry", "blueberry", "raspberry", 
+    "mango", "olives", "peach", "lemon", "pear", "fig", "pineapple", "grape", "kiwi", "melon", 
+    "orange", "watermelon", "steak", "pork", "chicken_duck", "sausage", "fried_meat", "lamb", 
+    "sauce", "crab", "fish", "shellfish", "shrimp", "soup", "bread", "corn", "hamburg", "pizza", 
+    "hanamaki_baozi", "wonton_dumplings", "pasta", "noodles", "rice", "pie", "tofu", "eggplant", 
+    "potato", "garlic", "cauliflower", "tomato", "kelp", "seaweed", "spring_onion", "rape", 
+    "ginger", "okra", "lettuce", "pumpkin", "cucumber", "white_radish", "carrot", "asparagus", 
+    "bamboo_shoots", "broccoli", "celery", "spinach", "green_pepper", "red_pepper", "dried_mushroom", 
+    "shiitake", "needle_mushroom", "sweet_potato", "kohlrabi", "chili", "enoki_mushroom", 
+    "oyster_mushroom", "white_button_mushroom", "salad", "other_ingredients"
+]
+
 MODEL_YOLO_PATH = 'model/best.pt'
 MODEL_KERAS_PATH = 'model/food_classifier_combined.keras'
 CATEGORIES_PATH = 'model/categories.json'
 
 yolo_model = None
 keras_model = None
-CATEGORIES = []
+KERAS_CATEGORIES = []
 
-# Load YOLO if available
 if HAS_YOLO and os.path.exists(MODEL_YOLO_PATH):
-    yolo_model = YOLO(MODEL_YOLO_PATH)
-    print("[✓] Loaded YOLOv11 Multi-Food model")
-    # Categories are built into the .pt file for YOLO
+    try: yolo_model = YOLO(MODEL_YOLO_PATH)
+    except: pass
 
-# Load Keras as fallback or primary if no YOLO
 if os.path.exists(MODEL_KERAS_PATH) and os.path.exists(CATEGORIES_PATH):
-    keras_model = load_model(MODEL_KERAS_PATH)
-    with open(CATEGORIES_PATH, 'r') as f:
-        CATEGORIES = json.load(f)
-    print(f"[✓] Loaded Keras model with {len(CATEGORIES)} categories")
-elif os.path.exists('model/fine_tuned_food_classifier.keras'):
-    keras_model = load_model('model/fine_tuned_food_classifier.keras')
-    CATEGORIES = ['apple_pie', 'cheesecake', 'chicken_curry', 'french_fries', 'fried_rice',
-                  'hamburger', 'hot_dog', 'ice_cream', 'omelette', 'pizza', 'sushi']
-    print("[!] Using old Keras model")
-else:
-    print("[✗] No model found! Prepare 'model/best.pt' or 'model/food_classifier_combined.keras'")
+    try:
+        keras_model = load_model(MODEL_KERAS_PATH)
+        with open(CATEGORIES_PATH, 'r') as f: KERAS_CATEGORIES = json.load(f)
+    except: pass
 
-TARGET_SIZE = (224, 224)
-
-# ── Nutritional Info (per serving, approximate) ─────────────────────
-# Covers Food-101 categories + 35 Indian/Western varieties
 NUTRIENTS = {
-    # === Food-101 Categories ===
-    # serving_size is in grams, nutrition values are per that serving
-    'apple_pie': {'calories': 237, 'protein': 2, 'carbs': 34, 'fat': 11, 'serving_size': 125},
-    'baby_back_ribs': {'calories': 290, 'protein': 22, 'carbs': 5, 'fat': 21, 'serving_size': 150},
-    'baklava': {'calories': 334, 'protein': 5, 'carbs': 38, 'fat': 19, 'serving_size': 78},
-    'beef_carpaccio': {'calories': 180, 'protein': 18, 'carbs': 2, 'fat': 11, 'serving_size': 115},
-    'beef_tartare': {'calories': 200, 'protein': 20, 'carbs': 2, 'fat': 12, 'serving_size': 120},
-    'beet_salad': {'calories': 90, 'protein': 2, 'carbs': 14, 'fat': 3, 'serving_size': 150},
-    'beignets': {'calories': 320, 'protein': 5, 'carbs': 42, 'fat': 15, 'serving_size': 90},
-    'bibimbap': {'calories': 490, 'protein': 25, 'carbs': 62, 'fat': 15, 'serving_size': 400},
-    'bread_pudding': {'calories': 290, 'protein': 6, 'carbs': 43, 'fat': 11, 'serving_size': 150},
-    'breakfast_burrito': {'calories': 350, 'protein': 15, 'carbs': 35, 'fat': 16, 'serving_size': 200},
-    'bruschetta': {'calories': 120, 'protein': 3, 'carbs': 16, 'fat': 5, 'serving_size': 80},
-    'caesar_salad': {'calories': 200, 'protein': 8, 'carbs': 10, 'fat': 14, 'serving_size': 200},
-    'cannoli': {'calories': 230, 'protein': 5, 'carbs': 25, 'fat': 12, 'serving_size': 85},
-    'caprese_salad': {'calories': 180, 'protein': 10, 'carbs': 4, 'fat': 14, 'serving_size': 175},
-    'carrot_cake': {'calories': 310, 'protein': 3, 'carbs': 44, 'fat': 14, 'serving_size': 110},
-    'ceviche': {'calories': 130, 'protein': 15, 'carbs': 10, 'fat': 3, 'serving_size': 150},
-    'cheese_plate': {'calories': 350, 'protein': 18, 'carbs': 5, 'fat': 28, 'serving_size': 100},
-    'cheesecake': {'calories': 321, 'protein': 5, 'carbs': 26, 'fat': 22, 'serving_size': 125},
-    'chicken_curry': {'calories': 300, 'protein': 22, 'carbs': 14, 'fat': 18, 'serving_size': 250},
-    'chicken_quesadilla': {'calories': 400, 'protein': 22, 'carbs': 30, 'fat': 20, 'serving_size': 180},
-    'chicken_wings': {'calories': 320, 'protein': 27, 'carbs': 8, 'fat': 20, 'serving_size': 160},
-    'chocolate_cake': {'calories': 350, 'protein': 4, 'carbs': 50, 'fat': 16, 'serving_size': 110},
-    'chocolate_mousse': {'calories': 260, 'protein': 4, 'carbs': 28, 'fat': 16, 'serving_size': 120},
-    'churros': {'calories': 280, 'protein': 3, 'carbs': 38, 'fat': 14, 'serving_size': 100},
-    'clam_chowder': {'calories': 200, 'protein': 8, 'carbs': 18, 'fat': 11, 'serving_size': 240},
-    'club_sandwich': {'calories': 400, 'protein': 25, 'carbs': 30, 'fat': 20, 'serving_size': 250},
-    'crab_cakes': {'calories': 220, 'protein': 14, 'carbs': 12, 'fat': 13, 'serving_size': 120},
-    'creme_brulee': {'calories': 310, 'protein': 4, 'carbs': 32, 'fat': 18, 'serving_size': 130},
-    'croque_madame': {'calories': 480, 'protein': 22, 'carbs': 28, 'fat': 30, 'serving_size': 250},
-    'cup_cakes': {'calories': 270, 'protein': 3, 'carbs': 38, 'fat': 12, 'serving_size': 75},
-    'deviled_eggs': {'calories': 130, 'protein': 6, 'carbs': 1, 'fat': 11, 'serving_size': 62},
-    'donuts': {'calories': 280, 'protein': 4, 'carbs': 33, 'fat': 15, 'serving_size': 75},
-    'dumplings': {'calories': 230, 'protein': 10, 'carbs': 28, 'fat': 8, 'serving_size': 150},
-    'edamame': {'calories': 120, 'protein': 12, 'carbs': 9, 'fat': 5, 'serving_size': 100},
-    'eggs_benedict': {'calories': 420, 'protein': 20, 'carbs': 26, 'fat': 26, 'serving_size': 240},
-    'escargots': {'calories': 170, 'protein': 14, 'carbs': 2, 'fat': 12, 'serving_size': 100},
-    'falafel': {'calories': 330, 'protein': 13, 'carbs': 32, 'fat': 18, 'serving_size': 100},
-    'filet_mignon': {'calories': 280, 'protein': 30, 'carbs': 0, 'fat': 17, 'serving_size': 170},
-    'fish_and_chips': {'calories': 500, 'protein': 22, 'carbs': 50, 'fat': 23, 'serving_size': 300},
-    'foie_gras': {'calories': 460, 'protein': 7, 'carbs': 4, 'fat': 44, 'serving_size': 100},
-    'french_fries': {'calories': 312, 'protein': 3, 'carbs': 41, 'fat': 15, 'serving_size': 117},
-    'french_onion_soup': {'calories': 300, 'protein': 12, 'carbs': 22, 'fat': 18, 'serving_size': 240},
-    'french_toast': {'calories': 280, 'protein': 8, 'carbs': 36, 'fat': 12, 'serving_size': 135},
-    'fried_calamari': {'calories': 270, 'protein': 14, 'carbs': 22, 'fat': 14, 'serving_size': 140},
-    'fried_rice': {'calories': 340, 'protein': 10, 'carbs': 48, 'fat': 12, 'serving_size': 200},
-    'frozen_yogurt': {'calories': 160, 'protein': 4, 'carbs': 30, 'fat': 3, 'serving_size': 150},
-    'garlic_bread': {'calories': 200, 'protein': 4, 'carbs': 24, 'fat': 10, 'serving_size': 60},
-    'gnocchi': {'calories': 250, 'protein': 5, 'carbs': 40, 'fat': 8, 'serving_size': 175},
-    'greek_salad': {'calories': 150, 'protein': 5, 'carbs': 10, 'fat': 11, 'serving_size': 200},
-    'grilled_cheese_sandwich': {'calories': 370, 'protein': 14, 'carbs': 28, 'fat': 23, 'serving_size': 130},
-    'grilled_salmon': {'calories': 250, 'protein': 30, 'carbs': 0, 'fat': 14, 'serving_size': 170},
-    'guacamole': {'calories': 150, 'protein': 2, 'carbs': 8, 'fat': 13, 'serving_size': 100},
-    'gyoza': {'calories': 200, 'protein': 8, 'carbs': 24, 'fat': 8, 'serving_size': 140},
-    'hamburger': {'calories': 400, 'protein': 22, 'carbs': 30, 'fat': 22, 'serving_size': 200},
-    'hot_and_sour_soup': {'calories': 120, 'protein': 6, 'carbs': 12, 'fat': 5, 'serving_size': 240},
-    'hot_dog': {'calories': 290, 'protein': 11, 'carbs': 22, 'fat': 18, 'serving_size': 100},
-    'huevos_rancheros': {'calories': 350, 'protein': 16, 'carbs': 28, 'fat': 20, 'serving_size': 250},
-    'hummus': {'calories': 180, 'protein': 7, 'carbs': 15, 'fat': 10, 'serving_size': 100},
-    'ice_cream': {'calories': 270, 'protein': 4, 'carbs': 32, 'fat': 14, 'serving_size': 132},
-    'lasagna': {'calories': 380, 'protein': 20, 'carbs': 32, 'fat': 18, 'serving_size': 250},
-    'lobster_bisque': {'calories': 280, 'protein': 12, 'carbs': 14, 'fat': 20, 'serving_size': 240},
-    'lobster_roll_sandwich': {'calories': 350, 'protein': 18, 'carbs': 28, 'fat': 18, 'serving_size': 200},
-    'macaroni_and_cheese': {'calories': 400, 'protein': 15, 'carbs': 40, 'fat': 20, 'serving_size': 200},
-    'macarons': {'calories': 150, 'protein': 2, 'carbs': 20, 'fat': 7, 'serving_size': 40},
-    'miso_soup': {'calories': 60, 'protein': 4, 'carbs': 6, 'fat': 2, 'serving_size': 240},
-    'mussels': {'calories': 170, 'protein': 24, 'carbs': 7, 'fat': 4, 'serving_size': 150},
-    'nachos': {'calories': 350, 'protein': 10, 'carbs': 35, 'fat': 18, 'serving_size': 150},
-    'omelette': {'calories': 250, 'protein': 16, 'carbs': 2, 'fat': 20, 'serving_size': 150},
-    'onion_rings': {'calories': 330, 'protein': 5, 'carbs': 40, 'fat': 17, 'serving_size': 120},
-    'oysters': {'calories': 80, 'protein': 8, 'carbs': 5, 'fat': 3, 'serving_size': 85},
-    'pad_thai': {'calories': 400, 'protein': 15, 'carbs': 50, 'fat': 15, 'serving_size': 275},
-    'paella': {'calories': 350, 'protein': 18, 'carbs': 42, 'fat': 12, 'serving_size': 300},
-    'pancakes': {'calories': 250, 'protein': 6, 'carbs': 38, 'fat': 8, 'serving_size': 150},
-    'panna_cotta': {'calories': 280, 'protein': 4, 'carbs': 28, 'fat': 18, 'serving_size': 130},
-    'peking_duck': {'calories': 320, 'protein': 22, 'carbs': 10, 'fat': 22, 'serving_size': 150},
-    'pho': {'calories': 350, 'protein': 20, 'carbs': 40, 'fat': 10, 'serving_size': 400},
-    'pizza': {'calories': 300, 'protein': 12, 'carbs': 34, 'fat': 12, 'serving_size': 140},
-    'pork_chop': {'calories': 280, 'protein': 30, 'carbs': 0, 'fat': 17, 'serving_size': 170},
-    'poutine': {'calories': 450, 'protein': 15, 'carbs': 45, 'fat': 24, 'serving_size': 300},
-    'prime_rib': {'calories': 350, 'protein': 28, 'carbs': 0, 'fat': 26, 'serving_size': 170},
-    'pulled_pork_sandwich': {'calories': 400, 'protein': 22, 'carbs': 35, 'fat': 18, 'serving_size': 250},
-    'ramen': {'calories': 450, 'protein': 18, 'carbs': 55, 'fat': 16, 'serving_size': 400},
-    'ravioli': {'calories': 300, 'protein': 12, 'carbs': 35, 'fat': 12, 'serving_size': 200},
-    'red_velvet_cake': {'calories': 340, 'protein': 4, 'carbs': 46, 'fat': 16, 'serving_size': 120},
-    'risotto': {'calories': 320, 'protein': 8, 'carbs': 45, 'fat': 12, 'serving_size': 240},
-    'samosa': {'calories': 260, 'protein': 5, 'carbs': 28, 'fat': 14, 'serving_size': 100},
-    'sashimi': {'calories': 130, 'protein': 22, 'carbs': 0, 'fat': 4, 'serving_size': 100},
-    'scallops': {'calories': 150, 'protein': 20, 'carbs': 6, 'fat': 4, 'serving_size': 120},
-    'seaweed_salad': {'calories': 70, 'protein': 2, 'carbs': 10, 'fat': 2, 'serving_size': 100},
-    'shrimp_and_grits': {'calories': 350, 'protein': 18, 'carbs': 30, 'fat': 18, 'serving_size': 250},
-    'spaghetti_bolognese': {'calories': 400, 'protein': 20, 'carbs': 48, 'fat': 14, 'serving_size': 300},
-    'spaghetti_carbonara': {'calories': 450, 'protein': 18, 'carbs': 48, 'fat': 20, 'serving_size': 300},
-    'spring_rolls': {'calories': 200, 'protein': 5, 'carbs': 25, 'fat': 9, 'serving_size': 120},
-    'steak': {'calories': 300, 'protein': 30, 'carbs': 0, 'fat': 20, 'serving_size': 170},
-    'strawberry_shortcake': {'calories': 280, 'protein': 3, 'carbs': 38, 'fat': 13, 'serving_size': 130},
-    'sushi': {'calories': 200, 'protein': 8, 'carbs': 30, 'fat': 5, 'serving_size': 150},
-    'tacos': {'calories': 280, 'protein': 14, 'carbs': 22, 'fat': 15, 'serving_size': 130},
-    'takoyaki': {'calories': 250, 'protein': 10, 'carbs': 28, 'fat': 12, 'serving_size': 120},
-    'tiramisu': {'calories': 300, 'protein': 5, 'carbs': 32, 'fat': 16, 'serving_size': 130},
-    'tuna_tartare': {'calories': 160, 'protein': 22, 'carbs': 3, 'fat': 7, 'serving_size': 120},
-    'waffles': {'calories': 290, 'protein': 7, 'carbs': 38, 'fat': 12, 'serving_size': 140},
-
-    # === Indian & Western 35 Varieties (additional) ===
-    'baked_potato': {'calories': 160, 'protein': 4, 'carbs': 36, 'fat': 0, 'serving_size': 170},
-    'butter_naan': {'calories': 310, 'protein': 8, 'carbs': 45, 'fat': 12, 'serving_size': 90},
-    'chai': {'calories': 120, 'protein': 3, 'carbs': 18, 'fat': 4, 'serving_size': 200},
-    'chapati': {'calories': 120, 'protein': 3, 'carbs': 25, 'fat': 1, 'serving_size': 40},
-    'chole_bhature': {'calories': 450, 'protein': 12, 'carbs': 52, 'fat': 22, 'serving_size': 300},
-    'crispy_chicken': {'calories': 350, 'protein': 25, 'carbs': 18, 'fat': 20, 'serving_size': 150},
-    'dal_makhani': {'calories': 230, 'protein': 9, 'carbs': 28, 'fat': 9, 'serving_size': 200},
-    'dhokla': {'calories': 130, 'protein': 5, 'carbs': 20, 'fat': 3, 'serving_size': 100},
-    'donut': {'calories': 280, 'protein': 4, 'carbs': 33, 'fat': 15, 'serving_size': 75},
-    'dosa': {'calories': 170, 'protein': 4, 'carbs': 28, 'fat': 5, 'serving_size': 100},
-    'fries': {'calories': 312, 'protein': 3, 'carbs': 41, 'fat': 15, 'serving_size': 117},
-    'fried_rice_indian': {'calories': 350, 'protein': 8, 'carbs': 50, 'fat': 14, 'serving_size': 200},
-    'idli': {'calories': 80, 'protein': 2, 'carbs': 16, 'fat': 0, 'serving_size': 60},
-    'jalebi': {'calories': 380, 'protein': 2, 'carbs': 58, 'fat': 16, 'serving_size': 100},
-    'kaathi_rolls': {'calories': 320, 'protein': 14, 'carbs': 32, 'fat': 14, 'serving_size': 180},
-    'kadai_paneer': {'calories': 280, 'protein': 14, 'carbs': 10, 'fat': 20, 'serving_size': 200},
-    'kulfi': {'calories': 200, 'protein': 4, 'carbs': 28, 'fat': 8, 'serving_size': 100},
-    'masala_dosa': {'calories': 250, 'protein': 6, 'carbs': 35, 'fat': 10, 'serving_size': 150},
-    'momos': {'calories': 230, 'protein': 10, 'carbs': 28, 'fat': 8, 'serving_size': 150},
-    'naan': {'calories': 260, 'protein': 7, 'carbs': 40, 'fat': 8, 'serving_size': 90},
-    'paani_puri': {'calories': 150, 'protein': 3, 'carbs': 22, 'fat': 6, 'serving_size': 80},
-    'pakode': {'calories': 300, 'protein': 5, 'carbs': 25, 'fat': 20, 'serving_size': 100},
-    'pav_bhaji': {'calories': 350, 'protein': 8, 'carbs': 42, 'fat': 16, 'serving_size': 250},
-    'sandwich': {'calories': 350, 'protein': 15, 'carbs': 35, 'fat': 16, 'serving_size': 180},
-    'taco': {'calories': 280, 'protein': 14, 'carbs': 22, 'fat': 15, 'serving_size': 130},
-    'taquito': {'calories': 220, 'protein': 8, 'carbs': 24, 'fat': 10, 'serving_size': 100},
-    'burger': {'calories': 400, 'protein': 22, 'carbs': 30, 'fat': 22, 'serving_size': 200},
-    # --- New 60 Categories ---
-    'adal_makhani': {'calories': 230, 'protein': 9, 'carbs': 28, 'fat': 9, 'serving_size': 200},
-    'aloo_gobi': {'calories': 150, 'protein': 4, 'carbs': 18, 'fat': 8, 'serving_size': 200},
-    'apple': {'calories': 52, 'protein': 0.3, 'carbs': 14, 'fat': 0.2, 'serving_size': 100},
-    'banana': {'calories': 89, 'protein': 1.1, 'carbs': 23, 'fat': 0.3, 'serving_size': 100},
-    'biryani': {'calories': 450, 'protein': 20, 'carbs': 55, 'fat': 18, 'serving_size': 350},
-    'butter_chicken': {'calories': 350, 'protein': 25, 'carbs': 10, 'fat': 24, 'serving_size': 250},
-    'cake': {'calories': 350, 'protein': 4, 'carbs': 50, 'fat': 16, 'serving_size': 110},
-    'carrot': {'calories': 41, 'protein': 0.9, 'carbs': 10, 'fat': 0.2, 'serving_size': 100},
-    'chana_masala': {'calories': 200, 'protein': 10, 'carbs': 30, 'fat': 6, 'serving_size': 200},
-    'chicken_tikka': {'calories': 250, 'protein': 35, 'carbs': 5, 'fat': 10, 'serving_size': 200},
-    'coffee': {'calories': 2, 'protein': 0.1, 'carbs': 0, 'fat': 0, 'serving_size': 200},
-    'cookie': {'calories': 150, 'protein': 2, 'carbs': 20, 'fat': 7, 'serving_size': 30},
-    'croissant': {'calories': 230, 'protein': 5, 'carbs': 26, 'fat': 12, 'serving_size': 60},
-    'cucumber': {'calories': 15, 'protein': 0.7, 'carbs': 4, 'fat': 0.1, 'serving_size': 100},
-    'dal_tadka': {'calories': 180, 'protein': 8, 'carbs': 24, 'fat': 6, 'serving_size': 200},
-    'egg_curry': {'calories': 250, 'protein': 14, 'carbs': 8, 'fat': 18, 'serving_size': 200},
-    'fish_curry': {'calories': 200, 'protein': 22, 'carbs': 6, 'fat': 10, 'serving_size': 250},
-    'fruit_juice': {'calories': 110, 'protein': 1, 'carbs': 26, 'fat': 0, 'serving_size': 240},
-    'grapes': {'calories': 67, 'protein': 0.7, 'carbs': 18, 'fat': 0.4, 'serving_size': 100},
-    'ice_cream': {'calories': 210, 'protein': 4, 'carbs': 25, 'fat': 11, 'serving_size': 100},
-    'kheer': {'calories': 250, 'protein': 6, 'carbs': 40, 'fat': 8, 'serving_size': 150},
-    'lassi': {'calories': 150, 'protein': 5, 'carbs': 25, 'fat': 4, 'serving_size': 250},
-    'mango': {'calories': 60, 'protein': 0.8, 'carbs': 15, 'fat': 0.4, 'serving_size': 100},
-    'muffin': {'calories': 350, 'protein': 5, 'carbs': 50, 'fat': 15, 'serving_size': 100},
-    'pasta': {'calories': 300, 'protein': 12, 'carbs': 55, 'fat': 4, 'serving_size': 200},
-    'poha': {'calories': 180, 'protein': 4, 'carbs': 35, 'fat': 3, 'serving_size': 150},
-    'pulao': {'calories': 250, 'protein': 5, 'carbs': 45, 'fat': 6, 'serving_size': 200},
-    'soda': {'calories': 140, 'protein': 0, 'carbs': 35, 'fat': 0, 'serving_size': 355},
-    'strawberry': {'calories': 32, 'protein': 0.7, 'carbs': 8, 'fat': 0.3, 'serving_size': 100},
-    'tomato': {'calories': 18, 'protein': 0.9, 'carbs': 4, 'fat': 0.2, 'serving_size': 100},
-    'vada': {'calories': 150, 'protein': 4, 'carbs': 18, 'fat': 7, 'serving_size': 60},
-    'waffle': {'calories': 250, 'protein': 6, 'carbs': 35, 'fat': 10, 'serving_size': 100},
-    'broccoli': {'calories': 34, 'protein': 2.8, 'carbs': 7, 'fat': 0.4, 'serving_size': 100},
+    'soup': {'calories': 50, 'protein': 2, 'carbs': 8, 'fat': 1.5, 'serving_size': 200, 'density': 1.0, 'thickness': 4.0},
+    'sauce': {'calories': 100, 'protein': 1, 'carbs': 12, 'fat': 6, 'serving_size': 50, 'density': 1.1, 'thickness': 1.5},
+    'potato': {'calories': 77, 'protein': 2, 'carbs': 17, 'fat': 0.1, 'serving_size': 150, 'density': 0.7, 'thickness': 3.0},
+    'rice': {'calories': 130, 'protein': 2.7, 'carbs': 28, 'fat': 0.3, 'serving_size': 100, 'density': 0.9, 'thickness': 2.0},
+    'bread': {'calories': 265, 'protein': 9, 'carbs': 49, 'fat': 3.2, 'serving_size': 100, 'density': 0.4, 'thickness': 2.0},
+    'cake': {'calories': 350, 'protein': 4, 'carbs': 50, 'fat': 16, 'serving_size': 100, 'density': 0.7, 'thickness': 5.0},
+    'other_ingredients': {'calories': 50, 'protein': 2, 'carbs': 5, 'fat': 2, 'serving_size': 100, 'density': 0.8, 'thickness': 2.0},
 }
 
+INDIAN_COMPATIBILITY = {
+    'idli': {'calories': 80, 'protein': 2, 'carbs': 16, 'fat': 0.2, 'serving_size': 60, 'density': 0.6, 'thickness': 2.5},
+    'sambar': {'calories': 60, 'protein': 3, 'carbs': 10, 'fat': 2, 'serving_size': 150, 'density': 1.0, 'thickness': 5.0},
+    'chutney': {'calories': 80, 'protein': 1, 'carbs': 6, 'fat': 6, 'serving_size': 30, 'density': 1.1, 'thickness': 1.5},
+    'biryani': {'calories': 450, 'protein': 20, 'carbs': 55, 'fat': 18, 'serving_size': 350, 'density': 0.85, 'thickness': 3.5},
+}
+
+def detect_plates(img_pil):
+    try:
+        w, h = img_pil.size
+        scale = 800 / float(w) if w > 800 else 1.0
+        img_np = np.array(img_pil.resize((int(w*scale), int(h*scale))))
+        gray = cv2.cvtColor(cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR), cv2.COLOR_BGR2GRAY)
+        circles = cv2.HoughCircles(cv2.medianBlur(gray, 5), cv2.HOUGH_GRADIENT, 1.2, 100, param1=50, param2=30, minRadius=int(40*scale), maxRadius=int(400*scale))
+        plates = []
+        if circles is not None:
+            for i in np.uint16(np.around(circles))[0, :]:
+                orad = int(i[2]/scale)
+                plates.append({'center': (int(i[0]/scale), int(i[1]/scale)), 'radius': orad, 'scale': STANDARD_PLATE_DIAMETER_CM/(2*orad)})
+        return plates
+    except: return []
 
 @app.route('/')
-def index():
-    return render_template('index.html')
-
+def index(): return render_template('index.html')
 
 @app.route('/classify', methods=['POST'])
 def classify_image():
-    if yolo_model is None and keras_model is None:
-        return jsonify({'error': 'No model loaded. Train a model first.'}), 500
-
+    if not yolo_model: return jsonify({'error': 'YOLO model not loaded.'}), 500
     try:
         file = request.files.get('image')
-        if not file:
-            return jsonify({'error': 'No image provided'}), 400
-
         img = Image.open(file.stream).convert('RGB')
-        
-        # --- Case 1: YOLO Model (Multi-Object Detection) ---
-        if yolo_model:
-            results = yolo_model(img) # Inference
-            detections = []
-            
-            for r in results:
-                for box in r.boxes:
-                    cls_id = int(box.cls[0])
-                    label = yolo_model.names[cls_id]
-                    prob = float(box.conf[0])
-                    
-                    if prob > 0.25: # Confidence threshold
-                        nutrient_info = NUTRIENTS.get(label, {
-                            'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0
-                        })
-                        detections.append({
-                            'class': label,
-                            'confidence': round(prob * 100, 1),
-                            'nutrients': nutrient_info
-                        })
-            
-            if not detections:
-                return jsonify({'error': 'No food items detected'}), 404
+        plates = detect_plates(img)
+        results = yolo_model(img)
+        detections = []
+        for r in results:
+            if not hasattr(r, 'boxes'): continue
+            for i in range(len(r.boxes)):
+                box, conf = r.boxes[i], float(r.boxes[i].conf[0])
+                if conf < 0.05: continue
                 
-            return jsonify({
-                'is_multi': True,
-                'items': detections
-            })
+                cls_id = int(box.cls[0])
+                label = FOODSEG103_NAMES[cls_id] if yolo_model.names[cls_id].startswith("food_") else yolo_model.names[cls_id]
+                coords = box.xyxy[0].tolist()
+                
+                # Hybrid Logic: Try to refine label using Keras
+                final_label = label
+                if keras_model:
+                    try:
+                        crop = img.crop(coords).resize(TARGET_SIZE)
+                        pred = keras_model.predict(np.expand_dims(np.array(crop), 0), verbose=0)
+                        k_idx = np.argmax(pred)
+                        if pred[0][k_idx] > 0.35:
+                            k_label = KERAS_CATEGORIES[k_idx].lower()
+                            if (label == 'rice' and 'biryani' in k_label) or \
+                               (label == 'bread' and ('dosa' in k_label or 'roti' in k_label)) or \
+                               (label == 'cake' and 'idli' in k_label) or \
+                               (label == 'potato' and 'idli' in k_label):
+                                final_label = k_label
+                    except: pass
+                
+                nutri = NUTRIENTS.get(final_label, INDIAN_COMPATIBILITY.get(final_label, NUTRIENTS['other_ingredients'])).copy()
+                display_label = final_label.replace('_', ' ').title()
+                
+                # Sambar/Idli Synonym injection
+                if 'soup' in final_label: display_label, nutri = "Soup (Sambar?)", INDIAN_COMPATIBILITY['sambar']
+                elif 'sauce' in final_label: display_label, nutri = "Sauce (Chutney?)", INDIAN_COMPATIBILITY['chutney']
+                elif 'potato' in final_label and conf < 0.3: display_label, nutri = "Sauce (Chutney?)", INDIAN_COMPATIBILITY['chutney']
+                elif ('cake' in final_label or 'potato' in final_label) and 'idli' not in final_label: 
+                    display_label, nutri = "Cake (Idly?)", INDIAN_COMPATIBILITY['idli']
+                
+                # Weight
+                area_px = (coords[2]-coords[0]) * (coords[3]-coords[1]) * 0.75
+                if hasattr(r, 'masks') and r.masks is not None and i < len(r.masks):
+                    m = r.masks[i].data[0].cpu().numpy()
+                    area_px = np.sum(m > 0.5) * (img.size[1]/m.shape[0]) * (img.size[0]/m.shape[1])
+                
+                weight = 100
+                cx, cy = (coords[0]+coords[2])/2, (coords[1]+coords[3])/2
+                plate = next((p for p in plates if np.sqrt((cx-p['center'][0])**2 + (cy-p['center'][1])**2) <= p['radius']*1.5), plates[0] if plates else None)
+                if plate: weight = max(10, min(1500, round(area_px * (plate['scale']**2) * nutri.get('density', 0.8) * nutri.get('thickness', 2.0))))
+                
+                detections.append({'class': display_label, 'confidence': round(conf*100, 1), 'nutrients': nutri, 'detected_weight': weight})
 
-        # --- Case 2: Keras Model (Single Classification Fallback) ---
-        else:
-            img_resized = img.resize(TARGET_SIZE)
-            img_array = np.array(img_resized)
-            img_array = np.expand_dims(img_array, axis=0)
-
-            prediction = keras_model.predict(img_array)
-            predicted_idx = np.argmax(prediction)
-            predicted_class = CATEGORIES[predicted_idx]
-            confidence = float(prediction[0][predicted_idx])
-
-            nutrient_info = NUTRIENTS.get(predicted_class, {
-                'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0
-            })
-
-            return jsonify({
-                'is_multi': False,
-                'class': predicted_class,
-                'confidence': round(confidence * 100, 1),
-                'nutrients': nutrient_info
-            })
-
+        if not detections: return jsonify({'error': 'No food detected.'}), 404
+        return jsonify({'is_multi': True, 'items': detections})
     except Exception as e:
+        print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
 
-
-if __name__ == '__main__':
-    app.run(debug=True)
+if __name__ == '__main__': app.run(debug=True)

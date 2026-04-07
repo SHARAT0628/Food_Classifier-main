@@ -120,23 +120,23 @@ def build_model(num_classes):
     return model, base_model
 
 def main():
-    print("=" * 60)
-    print("  Food Classifier Training — Streaming Dataset")
-    print("=" * 60)
+    print("============================================================")
+    print("  Food Classifier Training - Streaming Dataset")
+    print("============================================================")
 
     categories = discover_categories()
     if not categories: return
 
     print("\n[INFO] Finding image paths to build data loaders...")
     paths, labels = get_image_paths(categories, max_per_category=700) # Limited to save time/space
-    print(f"[✓] Total valid images discovered: {len(paths)}")
+    print(f"[OK] Total valid images discovered: {len(paths)}")
 
     train_paths, val_paths, train_labels, val_labels = train_test_split(paths, labels, test_size=0.2, random_state=42, stratify=labels)
     
     train_gen = FoodDataGenerator(train_paths, train_labels, BATCH_SIZE, TARGET_SIZE, augment=True)
     val_gen = FoodDataGenerator(val_paths, val_labels, BATCH_SIZE, TARGET_SIZE, augment=False)
 
-    print("\n── Phase 1: Transfer Learning ──────────────────────────")
+    print("\n-- Phase 1: Transfer Learning --------------------------")
     if os.path.exists(MODEL_SAVE_PATH):
         from keras._tf_keras.keras.models import load_model
         print(f"\n[INFO] Found existing model at {MODEL_SAVE_PATH}, resuming training!")
@@ -154,14 +154,14 @@ def main():
 
     history = model.fit(train_gen, epochs=EPOCHS, validation_data=val_gen, callbacks=callbacks)
 
-    print("\n── Phase 2: Fine-tuning ─────────────────────────────────")
+    print("\n-- Phase 2: Fine-tuning ---------------------------------")
     for layer in base_model.layers[-20:]: layer.trainable = True
     from keras._tf_keras.keras.optimizers import Adam
     model.compile(optimizer=Adam(learning_rate=1e-4), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     
     history2 = model.fit(train_gen, epochs=10, validation_data=val_gen, callbacks=callbacks)
 
-    print(f"\n[✓] Model saved to: {MODEL_SAVE_PATH}")
+    print(f"\n[OK] Model saved to: {MODEL_SAVE_PATH}")
     with open(CATEGORIES_SAVE_PATH, 'w') as f: json.dump(categories, f, indent=2)
 
 if __name__ == '__main__':

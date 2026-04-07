@@ -641,7 +641,7 @@
                         <div class="quantity-presets">
                             <button class="preset-btn active" id="preset-100g" onclick="setQuantity(100, this)">Per 100g</button>
                             <button class="preset-btn" id="preset-serving" onclick="setQuantity(currentServingSize, this)">Per Serving</button>
-                            <button class="preset-btn" id="preset-200g" onclick="setQuantity(200, this)">200g</button>
+                            <button class="preset-btn" id="preset-auto" style="display:none;" onclick="setQuantity(autoWeight, this)">Auto (Plate)</button>
                             <button class="preset-btn" id="preset-500g" onclick="setQuantity(500, this)">500g</button>
                         </div>
                     </div>
@@ -684,6 +684,7 @@
 
         let baseNutrients = { calories: 0, protein: 0, carbs: 0, fat: 0 };
         let currentServingSize = 100;
+        let autoWeight = 100;
 
         uploadBox.addEventListener('dragover', (e) => { e.preventDefault(); uploadBox.classList.add('dragover'); });
         uploadBox.addEventListener('dragleave', () => { uploadBox.classList.remove('dragover'); });
@@ -835,10 +836,24 @@
             currentServingSize = data.nutrients.serving_size || 100;
             servingLabel.textContent = 'Standard serving: ' + currentServingSize + 'g';
             document.getElementById('preset-serving').textContent = 'Per Serving (' + currentServingSize + 'g)';
+            
             const resultClass = document.getElementById('result-class');
-            if (resultClass) resultClass.textContent = data.class.replace(/_/g, ' ');
+            const targetClass = data.class || data.items?.[0]?.class || "Unknown";
+            if (resultClass) resultClass.textContent = targetClass.replace(/_/g, ' ');
+            
             document.getElementById('confidence-score').textContent = data.confidence + '% Conf';
-            setQuantity(100, document.getElementById('preset-100g'));
+
+            // Handle Auto-Weight
+            const autoBtn = document.getElementById('preset-auto');
+            if (data.detected_weight) {
+                autoWeight = data.detected_weight;
+                autoBtn.style.display = 'block';
+                autoBtn.textContent = 'Auto: ' + Math.round(autoWeight) + 'g';
+                setQuantity(autoWeight, autoBtn);
+            } else {
+                autoBtn.style.display = 'none';
+                setQuantity(100, document.getElementById('preset-100g'));
+            }
         }
 
         function animateNumber(id, endVal) {
